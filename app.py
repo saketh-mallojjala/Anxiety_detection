@@ -239,13 +239,23 @@
 
 
 
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify, abort
 import numpy as np
 import tensorflow as tf
 from keras.models import load_model
 import joblib
+import csv
+from pathlib import Path
 
 app = Flask(__name__)
+
+# Preload the mock physiological stream once at boot.
+_STREAM_PATH = Path(__file__).parent / "data" / "sample_stream.csv"
+with _STREAM_PATH.open() as _f:
+    STREAM_ROWS = [
+        {"t": int(r["t"]), "hr": float(r["hr"]), "eda": float(r["eda"]), "st": float(r["st"])}
+        for r in csv.DictReader(_f)
+    ]
 
 # Load the binary classification model (.tflite)
 binary_interpreter = tf.lite.Interpreter(model_path="final_model_federated.tflite")
@@ -397,6 +407,59 @@ def predict_multiclass():
                                status="warning",
                                message="Ensure all inputs are filled correctly.",
                                suggestions=[])
+
+
+@app.route('/live')
+def live():
+    return render_template('live.html', stream_len=len(STREAM_ROWS))
+
+
+@app.route('/api/stream/<int:i>')
+def api_stream(i):
+    """Return one row of the mock stream by index. Index wraps so the
+    dashboard can loop indefinitely without the client tracking length."""
+    if not STREAM_ROWS:
+        abort(503)
+    row = STREAM_ROWS[i % len(STREAM_ROWS)]
+    return jsonify({
+        "t":   row["t"],
+        "hr":  row["hr"],
+        "eda": row["eda"],
+        "st":  row["st"],
+        "n":   len(STREAM_ROWS),
+    })
+
+
+@app.route('/api/predict_batch', methods=['POST'])
+def api_predict_batch():
+    """Run the multiclass model on a sliding 4-step window.
+    Body: {"window": [[hr,eda,st], [hr,eda,st], [hr,eda,st], [hr,eda,st]]}
+    Note: scaler.transform expects columns ordered (hr, st, eda) to match
+    how the existing multi-class form is submitted — see /predict_multiclass.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    window = payload.get("window")
+    if not isinstance(window, list) or len(window) != 4:
+        return jsonify({"error": "window must be a list of 4 [hr,eda,st] triples"}), 400
+
+    try:
+        # Reorder client (hr, eda, st) -> training order (hr, st, eda).
+        feats = np.array([[r[0], r[2], r[1]] for r in window], dtype=np.float32)
+        feats = multiclass_scaler.transform(feats).reshape(1, 4, 3)
+        prediction = multiclass_model.predict(feats, verbose=0)
+        idx        = int(np.argmax(prediction, axis=1)[0])
+        label      = int(multiclass_label_encoder.inverse_transform([idx])[0])
+        probs      = [float(p) for p in prediction[0]]
+
+        name = {0: "Low", 1: "Moderate", 2: "High"}.get(label, str(label))
+        return jsonify({
+            "label":      label,
+            "label_name": name,
+            "probs":      probs,
+            "confidence": float(max(probs)),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

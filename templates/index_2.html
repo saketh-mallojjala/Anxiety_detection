@@ -3,206 +3,272 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anxiety Detection Tool</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
-    <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #212529;
-        }
-        .main-container {
-            background-color: white;
-            border-radius: 15px;
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-            padding: 2rem;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-        }
-        .header {
-            text-align: center;
-            padding: 1.5rem 0;
-            margin-bottom: 2rem;
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            border-radius: 10px;
-            color: white;
-        }
-        .input-section {
-            background-color: #f8f9fa;
-            padding: 2rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-        }
-        .btn-predict {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            border: none;
-            color: white;
-            padding: 0.8rem 2rem;
-            font-weight: 600;
-            border-radius: 30px;
-            transition: transform 0.3s ease;
-        }
-        .btn-predict:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
-        }
-        .result-section {
-            padding: 2rem;
-            border-radius: 10px;
-            margin-top: 2rem;
-            text-align: center;
-        }
-        .result-box {
-            padding: 1.5rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
-        }
-        .result-warning {
-            background-color: #fff3cd;
-            border-left: 5px solid #ffc107;
-        }
-        .result-success {
-            background-color: #d4edda;
-            border-left: 5px solid #28a745;
-        }
-        .suggestion-card {
-            background-color: white;
-            border-radius: 10px;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            display: flex;
-            align-items: flex-start;
-        }
-        .suggestion-icon {
-            color: #6a11cb;
-            margin-right: 1rem;
-            font-size: 1.2rem;
-            padding-top: 0.2rem;
-        }
-        .input-description {
-            font-size: 0.9rem;
-            color: #6c757d;
-            margin-top: 0.5rem;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 3rem;
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-    </style>
+    <title>Mindful · Anxiety Detection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <div class="container">
-        <div class="main-container">
-            <div class="header">
-                <h1><i class="fas fa-brain"></i> Anxiety Detection Tool</h1>
-                <p class="mb-0">Analyze your anxiety levels and get personalized health suggestions</p>
+
+<div class="shell">
+
+    <!-- ============ Topbar ============ -->
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark"><i class="fa-solid fa-spa"></i></div>
+            <div>
+                <div class="brand-name">Mindful</div>
+                <div class="brand-tag">anxiety detection · v2</div>
+            </div>
+        </div>
+        <div class="topbar-meta">
+            <span class="dot"></span>
+            <span>federated model · live</span>
+        </div>
+    </header>
+
+    <!-- ============ Hero ============ -->
+    <section class="hero">
+        <h1>A calmer way to <span class="accent">check in</span> with yourself.</h1>
+        <p>Enter your physiological signals — heart rate, electrodermal activity, and skin temperature — and our on-device model returns a mindful, private read on your anxiety state.</p>
+    </section>
+
+    <!-- ============ Grid ============ -->
+    <main class="grid">
+
+        <!-- ===== Inputs card ===== -->
+        <section class="glass" id="inputs-card">
+
+            <div class="tabs" role="tablist">
+                <span class="tab-pill" id="tab-pill"></span>
+                <button type="button" class="tab is-active" data-target="panel-binary" role="tab">
+                    <i class="fa-regular fa-circle-dot"></i>&nbsp; Single Reading
+                </button>
+                <button type="button" class="tab" data-target="panel-multiclass" role="tab">
+                    <i class="fa-solid fa-wave-square"></i>&nbsp; Time Series
+                </button>
             </div>
 
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="input-section">
-                        <h3 class="mb-4">Binary Anxiety Prediction</h3>
-                        <form action="{{ url_for('predict') }}" method="post">
-                            <div class="mb-4">
-                                <label for="input1" class="form-label">Heart Rate (BPM)</label>
-                                <input type="number" step="any" class="form-control" id="input1" name="input1" required>
-                            </div>
-                            <div class="mb-4">
-                                <label for="input2" class="form-label">Electrodermal Activity (EDA)</label>
-                                <input type="number" step="any" class="form-control" id="input2" name="input2" required>
-                            </div>
-                            <div class="mb-4">
-                                <label for="input3" class="form-label">Skin Temperature</label>
-                                <input type="number" step="any" class="form-control" id="input3" name="input3" required>
-                            </div>
-                            <div class="text-center">
-                                <button type="submit" class="btn btn-predict">
-                                    <i class="fas fa-search me-2"></i>Analyze Anxiety
-                                </button>
-                            </div>
-                        </form>
-                        <hr>
-                        <h3 class="mb-4">Multiclass Classification (4 Time Steps)</h3>
-                        <form action="{{ url_for('predict_multiclass') }}" method="post">
-                            {% for t in range(1, 5) %}
-                            <div class="mb-4">
-                                <label class="form-label">Time Step {{ t }} - Heart Rate</label>
-                                <input type="number" step="any" class="form-control" name="input1_{{ t }}" required>
-                                <label class="form-label">Time Step {{ t }} - Electrodermal Activity (EDA)</label>
-                                <input type="number" step="any" class="form-control" name="input2_{{ t }}" required>
-                                <label class="form-label">Time Step {{ t }} - Skin Temperature</label>
-                                <input type="number" step="any" class="form-control" name="input3_{{ t }}" required>
-                            </div>
-                            {% endfor %}
-                            <div class="text-center">
-                                <button type="submit" class="btn btn-predict">
-                                    <i class="fas fa-layer-group me-2"></i>Run Multiclass Prediction
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            <!-- Binary panel -->
+            <div class="panel is-active" id="panel-binary" role="tabpanel">
+                <p class="section-title">One snapshot · 3 signals</p>
 
-                <div class="col-lg-6">
-                    {% if prediction_text %}
-                    <div class="result-section">
-                        <div class="result-box {% if status == 'warning' %}result-warning{% else %}result-success{% endif %}">
-                            <h2>
-                                {% if status == 'warning' %}
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                {% else %}
-                                <i class="fas fa-check-circle me-2"></i>
-                                {% endif %}
-                                {{ prediction_text }}
-                            </h2>
-                        </div>
-                        <p class="mt-4">{{ message }}</p>
-                        <div class="suggestions-container mt-4">
-                            {% for suggestion in suggestions %}
-                            <div class="suggestion-card">
-                                <div class="suggestion-icon"><i class="fas fa-leaf"></i></div>
-                                <div>{{ suggestion }}</div>
+                <form action="{{ url_for('predict') }}" method="post" autocomplete="off">
+                    <div class="field">
+                        <label class="field-label" for="input1">
+                            <span class="ic"><i class="fa-solid fa-heart-pulse"></i></span>
+                            Heart Rate <span style="margin-left:auto;color:var(--ink-mute);font-weight:400">bpm</span>
+                        </label>
+                        <input class="input" type="number" step="any" id="input1" name="input1" placeholder="e.g. 78" required>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="input2">
+                            <span class="ic"><i class="fa-solid fa-bolt"></i></span>
+                            Electrodermal Activity <span style="margin-left:auto;color:var(--ink-mute);font-weight:400">µS</span>
+                        </label>
+                        <input class="input" type="number" step="any" id="input2" name="input2" placeholder="e.g. 0.5" required>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="input3">
+                            <span class="ic"><i class="fa-solid fa-temperature-half"></i></span>
+                            Skin Temperature <span style="margin-left:auto;color:var(--ink-mute);font-weight:400">°C</span>
+                        </label>
+                        <input class="input" type="number" step="any" id="input3" name="input3" placeholder="e.g. 33.1" required>
+                    </div>
+
+                    <button class="btn" type="submit">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        Analyze my state
+                    </button>
+                </form>
+            </div>
+
+            <!-- Multiclass panel -->
+            <div class="panel" id="panel-multiclass" role="tabpanel">
+                <p class="section-title">4 timesteps · low / moderate / high</p>
+
+                <form action="{{ url_for('predict_multiclass') }}" method="post" autocomplete="off">
+                    {% for t in range(1, 5) %}
+                    <div class="ts-step">
+                        <div class="ts-step-head">
+                            <div class="ts-step-title">
+                                <i class="fa-solid fa-clock"></i> Time step {{ t }}
                             </div>
-                            {% endfor %}
+                            <span class="ts-step-badge">t{{ t }}</span>
+                        </div>
+                        <div class="ts-triple">
+                            <div class="field">
+                                <label class="field-label">HR</label>
+                                <input class="input" type="number" step="any" name="input1_{{ t }}" placeholder="bpm" required>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">EDA</label>
+                                <input class="input" type="number" step="any" name="input2_{{ t }}" placeholder="µS" required>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">ST</label>
+                                <input class="input" type="number" step="any" name="input3_{{ t }}" placeholder="°C" required>
+                            </div>
                         </div>
                     </div>
-                    {% elif multiclass_prediction %}
-                    <div class="result-section">
-                        <div class="result-box result-success">
-                            <h2><i class="fas fa-layer-group me-2"></i> Multiclass Prediction</h2>
-                            <p class="mt-3">Predicted Class: <strong>{{ multiclass_prediction }}</strong></p>
+                    {% endfor %}
+
+                    <button class="btn" type="submit">
+                        <i class="fa-solid fa-chart-line"></i>
+                        Run time-series prediction
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ===== Result card ===== -->
+        <aside class="glass" id="result-card">
+            {% if prediction_text %}
+                {# Derive a UI level from the verdict text — backend stays untouched. #}
+                {% set txt = prediction_text|lower %}
+                {% if 'no anxiety' in txt or 'low' in txt %}
+                    {% set level = 'low' %}
+                    {% set pct   = 22 %}
+                    {% set cap   = 'Calm signal' %}
+                {% elif 'moderate' in txt %}
+                    {% set level = 'mid' %}
+                    {% set pct   = 58 %}
+                    {% set cap   = 'Moderate signal' %}
+                {% elif 'high' in txt or status == 'warning' %}
+                    {% set level = 'high' %}
+                    {% set pct   = 86 %}
+                    {% set cap   = 'Elevated signal' %}
+                {% else %}
+                    {% set level = 'mid' %}
+                    {% set pct   = 50 %}
+                    {% set cap   = 'Signal' %}
+                {% endif %}
+
+                <div class="result-card" data-level="{{ level }}" data-pct="{{ pct }}">
+                    <div class="gauge-wrap">
+                        <div class="gauge" id="gauge">
+                            <div class="gauge-label">
+                                <div class="gauge-number"><span id="gauge-num">0</span><span style="font-size:18px;color:var(--ink-mute)">%</span></div>
+                                <div class="gauge-cap">{{ cap }}</div>
+                            </div>
                         </div>
                     </div>
-                    {% else %}
-                    <div class="result-section">
-                        <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" width="80" class="mb-4" alt="Python Logo">
-                        <h3>Welcome to the Anxiety Detection Tool</h3>
-                        <p>This tool uses machine learning to analyze your physiological data to detect signs of anxiety and categorize emotional states.</p>
-                        <p>Use the forms to submit your inputs and get instant feedback.</p>
-                        <div class="mt-4">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <small>This tool is for informational purposes only and does not replace medical advice.</small>
+
+                    <div class="verdict">
+                        <span class="verdict-tag {{ level }}">
+                            {% if level == 'low'  %}<i class="fa-solid fa-leaf"></i>{% endif %}
+                            {% if level == 'mid'  %}<i class="fa-solid fa-wind"></i>{% endif %}
+                            {% if level == 'high' %}<i class="fa-solid fa-triangle-exclamation"></i>{% endif %}
+                            &nbsp;{{ level|upper }} · result
+                        </span>
+                        <h2>{{ prediction_text }}</h2>
+                        <p>{{ message }}</p>
+                    </div>
+
+                    {% if suggestions %}
+                    <div class="suggestions">
+                        {% for s in suggestions %}
+                        <div class="suggestion">
+                            <div class="leaf"><i class="fa-solid fa-seedling"></i></div>
+                            <div class="suggestion-text">{{ s }}</div>
                         </div>
+                        {% endfor %}
                     </div>
                     {% endif %}
                 </div>
-            </div>
+            {% else %}
+                <div class="result-empty">
+                    <div class="breath" aria-hidden="true"></div>
+                    <h2>Take a breath.</h2>
+                    <p>Submit a reading on the left and your personalized result — along with grounding suggestions — will appear here.</p>
+                    <div class="disclaimer">
+                        <i class="fa-solid fa-circle-info"></i>
+                        For informational use only — not medical advice.
+                    </div>
+                </div>
+            {% endif %}
+        </aside>
+    </main>
 
-            <div class="footer">
-                <p>
-                    <i class="fas fa-heart"></i> Mental Health Matters
-                    <span class="mx-2">•</span>
-                    <i class="fas fa-code"></i> Powered by TensorFlow & Flask
-                </p>
-            </div>
-        </div>
-    </div>
+    <!-- ============ Footer ============ -->
+    <footer class="foot">
+        <span><i class="fa-solid fa-heart" style="color:var(--sage-deep)"></i> Mental health matters</span>
+        <span class="sep"></span>
+        <span>Powered by TensorFlow Lite &amp; Flask</span>
+        <span class="sep"></span>
+        <span>{{ "%s"|format(2025) }}</span>
+    </footer>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // -------- Tabs --------
+    (function () {
+        const tabs   = document.querySelectorAll('.tab');
+        const panels = document.querySelectorAll('.panel');
+        const pill   = document.getElementById('tab-pill');
+
+        function placePill(tab) {
+            const r = tab.getBoundingClientRect();
+            const parent = tab.parentElement.getBoundingClientRect();
+            pill.style.left  = (r.left - parent.left) + 'px';
+            pill.style.width = r.width + 'px';
+        }
+
+        function activate(target, withAnim = true) {
+            tabs.forEach(t => t.classList.toggle('is-active', t.dataset.target === target));
+            panels.forEach(p => p.classList.toggle('is-active', p.id === target));
+            const active = document.querySelector('.tab.is-active');
+            if (active) placePill(active);
+        }
+
+        tabs.forEach(t => t.addEventListener('click', () => activate(t.dataset.target)));
+
+        // Initial position (after font load to be safe)
+        requestAnimationFrame(() => activate(document.querySelector('.tab.is-active').dataset.target, false));
+        window.addEventListener('resize', () => {
+            const active = document.querySelector('.tab.is-active');
+            if (active) placePill(active);
+        });
+    })();
+
+    // -------- Gauge animation --------
+    (function () {
+        const card = document.querySelector('.result-card');
+        if (!card) return;
+
+        const pct   = parseInt(card.dataset.pct, 10);
+        const level = card.dataset.level;
+        const gauge = document.getElementById('gauge');
+        const num   = document.getElementById('gauge-num');
+        const color = {
+            low:  getComputedStyle(document.documentElement).getPropertyValue('--gauge-low'),
+            mid:  getComputedStyle(document.documentElement).getPropertyValue('--gauge-mid'),
+            high: getComputedStyle(document.documentElement).getPropertyValue('--gauge-high')
+        }[level] || 'var(--gauge-mid)';
+
+        gauge.style.setProperty('--color', color);
+
+        // Animate fill + number
+        let start = null;
+        const duration = 1200;
+        function tick(ts) {
+            if (!start) start = ts;
+            const t = Math.min(1, (ts - start) / duration);
+            const eased = 1 - Math.pow(1 - t, 3);
+            const v = Math.round(eased * pct);
+            gauge.style.setProperty('--pct', v);
+            num.textContent = v;
+            if (t < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+
+        // Scroll into view on small screens
+        if (window.innerWidth < 960) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    })();
+</script>
 </body>
 </html>

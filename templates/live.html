@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindful · Live Stream</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+
+<div class="shell">
+
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark"><i class="fa-solid fa-spa"></i></div>
+            <div>
+                <div class="brand-name">Mindful</div>
+                <div class="brand-tag">live stream · v2</div>
+            </div>
+        </div>
+        <div class="topbar-meta">
+            <a href="{{ url_for('home') }}" style="color:var(--ink-soft);text-decoration:none;font-size:13px;">
+                <i class="fa-regular fa-pen-to-square"></i>&nbsp; manual entry
+            </a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <span class="live-pill"><span class="pulse"></span> Live Monitoring</span>
+        <h1>Real-time check-in for <span class="accent">Subject</span></h1>
+        <p>Heart rate, electrodermal activity, and skin temperature streaming from the wearable. Our model evaluates a 4-step rolling window and reports the current anxiety state.</p>
+    </section>
+
+    <!-- Status banner -->
+    <div class="status-banner" id="banner">
+        <div class="check"><i class="fa-solid fa-check" id="banner-icon"></i></div>
+        <div class="status-banner-text" id="banner-text">
+            <strong>Initializing stream…</strong> <span class="mute">waiting for first reading</span>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stats-row">
+        <div class="stat-card hr" id="card-hr">
+            <div class="stat-head">
+                <span class="stat-label">Heart Rate</span>
+                <span class="stat-emoji">❤️</span>
+            </div>
+            <div class="stat-value">
+                <span class="num" id="hr-num">—</span>
+                <span class="unit">bpm</span>
+            </div>
+            <div class="stat-sub" id="hr-sub">awaiting stream</div>
+            <svg class="spark" id="spark-hr" viewBox="0 0 200 36" preserveAspectRatio="none">
+                <path class="area" d=""></path>
+                <path d=""></path>
+            </svg>
+        </div>
+
+        <div class="stat-card eda" id="card-eda">
+            <div class="stat-head">
+                <span class="stat-label">Electrodermal</span>
+                <span class="stat-emoji">⚡</span>
+            </div>
+            <div class="stat-value">
+                <span class="num" id="eda-num">—</span>
+                <span class="unit">µS</span>
+            </div>
+            <div class="stat-sub" id="eda-sub">awaiting stream</div>
+            <svg class="spark" id="spark-eda" viewBox="0 0 200 36" preserveAspectRatio="none">
+                <path class="area" d=""></path>
+                <path d=""></path>
+            </svg>
+        </div>
+
+        <div class="stat-card st" id="card-st">
+            <div class="stat-head">
+                <span class="stat-label">Skin Temperature</span>
+                <span class="stat-emoji">🌡️</span>
+            </div>
+            <div class="stat-value">
+                <span class="num" id="st-num">—</span>
+                <span class="unit">°C</span>
+            </div>
+            <div class="stat-sub" id="st-sub">awaiting stream</div>
+            <svg class="spark" id="spark-st" viewBox="0 0 200 36" preserveAspectRatio="none">
+                <path class="area" d=""></path>
+                <path d=""></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Verdict + timeline -->
+    <div class="live-split">
+
+        <div class="verdict-card">
+            <div class="gauge-wrap">
+                <div class="gauge" id="live-gauge">
+                    <div class="gauge-label">
+                        <div class="gauge-number"><span id="live-pct">0</span><span style="font-size:14px;color:var(--ink-mute)">%</span></div>
+                        <div class="gauge-cap" id="live-cap">awaiting</div>
+                    </div>
+                </div>
+            </div>
+            <div class="verdict-meta">
+                <span class="verdict-tag low" id="verdict-tag">
+                    <i class="fa-solid fa-leaf"></i>&nbsp; LOW · result
+                </span>
+                <h3 id="verdict-name">Low Anxiety</h3>
+                <p id="verdict-msg">Subject's signals are within the calm range.</p>
+                <div class="probs" id="verdict-probs">
+                    <span data-k="0">Low –</span>
+                    <span data-k="1">Mod –</span>
+                    <span data-k="2">High –</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-card">
+            <h4><i class="fa-solid fa-clock-rotate-left"></i>&nbsp; Recent readings</h4>
+            <div class="timeline" id="timeline"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="ctl-pause" class="is-active"><i class="fa-solid fa-pause"></i> Pause</button>
+        <button id="ctl-speed">1× speed</button>
+        <button id="ctl-restart"><i class="fa-solid fa-rotate-right"></i> Restart</button>
+    </div>
+
+    <footer class="foot">
+        <span><i class="fa-solid fa-heart" style="color:var(--sage-deep)"></i> Mental health matters</span>
+        <span class="sep"></span>
+        <span>Mock stream · {{ stream_len }} readings on loop</span>
+    </footer>
+</div>
+
+<script>
+(function () {
+    const STREAM_LEN = {{ stream_len }};
+    const SPARK_LEN  = 60;          // points kept on each sparkline
+    const WINDOW     = 4;           // model takes 4-step windows
+    const INFER_EVERY = 4;          // call the model every N readings
+
+    const SPEED_STEPS = [
+        { label: '1× speed',  ms: 1500 },
+        { label: '2× speed',  ms: 750  },
+        { label: '4× speed',  ms: 375  },
+    ];
+    let speedIdx = 0;
+
+    let cursor   = 0;
+    let timer    = null;
+    let paused   = false;
+    const buffers = { hr: [], eda: [], st: [] };
+    const recent  = [];   // for the rolling timeline
+    let lastVerdict = null;
+
+    // ---------- Sparkline rendering ----------
+    function renderSpark(svgId, series) {
+        const svg  = document.getElementById(svgId);
+        const path = svg.querySelector('path:not(.area)');
+        const area = svg.querySelector('path.area');
+        if (series.length < 2) { path.setAttribute('d',''); area.setAttribute('d',''); return; }
+
+        const w = 200, h = 36, pad = 2;
+        const min = Math.min(...series), max = Math.max(...series);
+        const range = (max - min) || 1;
+        const dx = (w - pad * 2) / (SPARK_LEN - 1);
+
+        const pts = series.map((v, i) => {
+            const x = pad + (i + (SPARK_LEN - series.length)) * dx;
+            const y = pad + (h - pad * 2) * (1 - (v - min) / range);
+            return [x, y];
+        });
+
+        const d = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+        path.setAttribute('d', d);
+        const last = pts[pts.length - 1];
+        area.setAttribute('d', `${d} L${last[0]},${h} L${pts[0][0]},${h} Z`);
+    }
+
+    // ---------- Card updates ----------
+    function describeHr(v)  {
+        if (v < 80)  return ['Resting · trending stable', ''];
+        if (v < 100) return ['Slightly elevated',         'is-moderate'];
+        return ['⚠ Elevated — possible arousal',          'is-elevated'];
+    }
+    function describeEda(v) {
+        if (v < 0.5) return ['Calm baseline',             ''];
+        if (v < 0.9) return ['Rising skin conductance',   'is-moderate'];
+        return ['High conductance — sympathetic spike',    'is-elevated'];
+    }
+    function describeSt(v)  {
+        if (v < 33)   return ['Cool baseline',            ''];
+        if (v < 33.8) return ['Warming slightly',         'is-moderate'];
+        return ['Elevated — possible arousal',            'is-elevated'];
+    }
+
+    function pushReading(row) {
+        // buffers
+        for (const k of ['hr','eda','st']) {
+            buffers[k].push(row[k]);
+            if (buffers[k].length > SPARK_LEN) buffers[k].shift();
+        }
+
+        // numbers
+        document.getElementById('hr-num').textContent  = row.hr.toFixed(1);
+        document.getElementById('eda-num').textContent = row.eda.toFixed(2);
+        document.getElementById('st-num').textContent  = row.st.toFixed(2);
+
+        const [hrSub,  hrCls]  = describeHr(row.hr);
+        const [edaSub, edaCls] = describeEda(row.eda);
+        const [stSub,  stCls]  = describeSt(row.st);
+        document.getElementById('hr-sub').textContent  = hrSub;
+        document.getElementById('eda-sub').textContent = edaSub;
+        document.getElementById('st-sub').textContent  = stSub;
+        for (const [id, cls] of [['card-hr', hrCls], ['card-eda', edaCls], ['card-st', stCls]]) {
+            const el = document.getElementById(id);
+            el.classList.remove('is-moderate','is-elevated');
+            if (cls) el.classList.add(cls);
+        }
+
+        // sparklines
+        renderSpark('spark-hr',  buffers.hr);
+        renderSpark('spark-eda', buffers.eda);
+        renderSpark('spark-st',  buffers.st);
+    }
+
+    // ---------- Verdict ----------
+    const COLORS = { 0: '--gauge-low', 1: '--gauge-mid', 2: '--gauge-high' };
+    const PCTS   = { 0: 22, 1: 58, 2: 86 };
+    const CAPS   = { 0: 'Calm signal', 1: 'Moderate signal', 2: 'Elevated signal' };
+    const MSGS   = {
+        0: "Subject's signals are within the calm range.",
+        1: "Some stress detected — consider grounding cues.",
+        2: "Elevated anxiety signature — proactive support recommended.",
+    };
+    const TAGCLS = { 0: 'low', 1: 'mid', 2: 'high' };
+    const TAGTXT = { 0: 'LOW · result', 1: 'MOD · result', 2: 'HIGH · result' };
+    const TAGICON= { 0: 'fa-leaf', 1: 'fa-wind', 2: 'fa-triangle-exclamation' };
+
+    function applyVerdict(v) {
+        lastVerdict = v;
+        const color = getComputedStyle(document.documentElement).getPropertyValue(COLORS[v.label]).trim();
+        const pct   = PCTS[v.label];
+
+        const gauge = document.getElementById('live-gauge');
+        gauge.style.setProperty('--color', color);
+
+        // animate gauge
+        const num = document.getElementById('live-pct');
+        const startVal = parseInt(num.textContent, 10) || 0;
+        const dur = 800, t0 = performance.now();
+        function step(now) {
+            const t = Math.min(1, (now - t0) / dur);
+            const e = 1 - Math.pow(1 - t, 3);
+            const cur = Math.round(startVal + (pct - startVal) * e);
+            gauge.style.setProperty('--pct', cur);
+            num.textContent = cur;
+            if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+
+        document.getElementById('live-cap').textContent  = CAPS[v.label];
+        document.getElementById('verdict-name').textContent = `${v.label_name} Anxiety`;
+        document.getElementById('verdict-msg').textContent  = MSGS[v.label];
+
+        const tag = document.getElementById('verdict-tag');
+        tag.className = `verdict-tag ${TAGCLS[v.label]}`;
+        tag.innerHTML = `<i class="fa-solid ${TAGICON[v.label]}"></i>&nbsp; ${TAGTXT[v.label]}`;
+
+        const probs = document.getElementById('verdict-probs').children;
+        const names = ['Low','Mod','High'];
+        for (let i = 0; i < 3; i++) {
+            probs[i].textContent = `${names[i]} ${(v.probs[i]*100).toFixed(0)}%`;
+            probs[i].classList.toggle('peak', i === v.label);
+        }
+
+        // banner
+        const banner = document.getElementById('banner');
+        banner.classList.remove('is-mid','is-high');
+        if (v.label === 1) banner.classList.add('is-mid');
+        if (v.label === 2) banner.classList.add('is-high');
+        const icon = document.getElementById('banner-icon');
+        icon.className = `fa-solid ${TAGICON[v.label].replace('fa-triangle-exclamation','fa-exclamation')}`;
+        if (v.label === 0) icon.className = 'fa-solid fa-check';
+
+        const txt = document.getElementById('banner-text');
+        const last = buffers.hr[buffers.hr.length - 1];
+        const verdictLine = ['All clear', 'Some arousal', 'Elevated anxiety'][v.label];
+        txt.innerHTML = `<strong>${verdictLine}</strong> · HR ${last.toFixed(0)} bpm · <span class="mute">model confidence ${(v.confidence*100).toFixed(0)}%</span>`;
+    }
+
+    async function maybePredict(row) {
+        if (buffers.hr.length < WINDOW) return;
+        if (cursor % INFER_EVERY !== 0)  return;
+
+        const window = [];
+        for (let i = WINDOW; i > 0; i--) {
+            window.push([
+                buffers.hr [buffers.hr.length  - i],
+                buffers.eda[buffers.eda.length - i],
+                buffers.st [buffers.st.length  - i],
+            ]);
+        }
+        try {
+            const res = await fetch('/api/predict_batch', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ window }),
+            });
+            if (!res.ok) return;
+            const v = await res.json();
+            applyVerdict(v);
+            addTimelineRow(row, v);
+        } catch (e) { /* swallow — keep streaming */ }
+    }
+
+    // ---------- Timeline ----------
+    function addTimelineRow(row, v) {
+        const ts = String(row.t).padStart(3, '0');
+        const el = document.createElement('div');
+        el.className = 'timeline-row';
+        el.innerHTML = `
+            <span class="ts">t${ts}</span>
+            <span class="vals">
+                HR <strong>${row.hr.toFixed(0)}</strong> <em>·</em>
+                EDA <strong>${row.eda.toFixed(2)}</strong> <em>·</em>
+                ST <strong>${row.st.toFixed(1)}</strong>
+            </span>
+            <span class="pill ${TAGCLS[v.label]}">${v.label_name}</span>
+        `;
+        const tl = document.getElementById('timeline');
+        tl.insertBefore(el, tl.firstChild);
+        while (tl.children.length > 8) tl.removeChild(tl.lastChild);
+    }
+
+    // ---------- Streaming loop ----------
+    async function tick() {
+        if (paused) return;
+        try {
+            const res = await fetch(`/api/stream/${cursor}`);
+            if (!res.ok) return;
+            const row = await res.json();
+            pushReading(row);
+            await maybePredict(row);
+            cursor++;
+        } catch (e) { /* network blip — try again next tick */ }
+    }
+
+    function start() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(tick, SPEED_STEPS[speedIdx].ms);
+    }
+
+    // ---------- Controls ----------
+    const btnPause   = document.getElementById('ctl-pause');
+    const btnSpeed   = document.getElementById('ctl-speed');
+    const btnRestart = document.getElementById('ctl-restart');
+
+    btnPause.addEventListener('click', () => {
+        paused = !paused;
+        btnPause.classList.toggle('is-active', paused);
+        btnPause.innerHTML = paused
+            ? '<i class="fa-solid fa-play"></i> Resume'
+            : '<i class="fa-solid fa-pause"></i> Pause';
+    });
+    btnSpeed.addEventListener('click', () => {
+        speedIdx = (speedIdx + 1) % SPEED_STEPS.length;
+        btnSpeed.textContent = SPEED_STEPS[speedIdx].label;
+        start();
+    });
+    btnRestart.addEventListener('click', () => {
+        cursor = 0;
+        for (const k of Object.keys(buffers)) buffers[k].length = 0;
+        document.getElementById('timeline').innerHTML = '';
+    });
+
+    // Initial — unpause and start
+    paused = false;
+    btnPause.classList.remove('is-active');
+    btnPause.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+    tick();
+    start();
+})();
+</script>
+</body>
+</html>
